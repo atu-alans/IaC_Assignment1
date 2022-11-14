@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This is an AWS CloudFormation template based on this YAML file https://www.wellarchitectedlabs.com/Reliability/200_Deploy_and_Update_CloudFormation/Code/CloudFormation/simple_stack_plus_s3_ec2.yaml
+  The template creates a VPC and an EC2 instance. The instance is within a security group. There is public access via a routing table.
+
+
+
+Parameters:
+
+
+  NamingPrefix:
+    Type: String
+    Description: The naming prefix for resources created by this template.
+    Default: BasicServer
+
+
+  IfPublicAllowed:
+    Description: Is public access required
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: false
+
+  IfSGAllowed:
+    Description: Is a security group required
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: false
+
+
+  VPCBlock:
+    Description: 'VPC IP RANGE'
+    Type: String
+    Default: 192.0.0.0/16
+
+  PublicBlock:
+    Description: 'Public Subnet IP'
+    Type: String
+    Default: 10.1.1.0/24
+
+  SecGroupAllowed:
+    Description: Allowed IP Range to access the server
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+
+  AMIType:
+    Description: Gets the latest AMI from Systems Manager Parameter store
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+    ConstraintDescription: must be a valid EC2 instance type.
+
+
+Conditions:
+  PublicEnabled: !Equals [!Ref IfPublicAllowed, "true"]
+
+  EC2SecurityEnabled: !Equals [!Ref IfSGAllowed, "true"]
+
+
+Resources:
+
+
+  EC2WebserverInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIType
+      InstanceType: !Ref InstanceType
+      SecurityGroupIds:
+        - !Ref PublicSecurityGroup
+      SubnetId: !Ref SubnetforPublic
+      Tags:
+        - Key: Name
+          Value: Basic EC2 WebServer
+
+
+  CreateVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCBlock
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - VPC
+
+  CreateGateway:
+    Condition: PublicEnabled
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - CreateGateway
+  AddGateway:
+    Condition: PublicEnabled
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref CreateVPC
+      InternetGatewayId: !Ref CreateGateway
+
+
+  PublicInternetRoute:
+    Condition: PublicEnabled
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref CreateGateway
+      RouteTableId: !Ref RoutingTable
+
+  RoutingTable:
+    Condition: PublicEnabled
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref CreateVPC
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - Public
+              - RTB
+
+
+  SubnetforPublic:
+    Condition: PublicEnabled
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref CreateVPC
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: 'AWS::Region'
+      CidrBlock: !Ref PublicBlock
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - Public
+              - 1
+
+  PublicSubnet1RouteToInternet:
+    Condition: PublicEnabled
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn:
+      - SubnetforPublic
+      - RoutingTable
+    Properties:
+      RouteTableId: !Ref RoutingTable
+      SubnetId: !Ref SubnetforPublic
+
+
+  PublicSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: EC2SecurityEnabled
+    Properties:
+      VpcId: !Ref CreateVPC
+      GroupName: !Join
+        - '-'
+        - - !Ref NamingPrefix
+          - SG
+      GroupDescription: >-
+        Enable HTTP access via port 80 and 443 to the allowed CIDR
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: !Ref SecGroupAllowed
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: !Ref SecGroupAllowed
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - SG
+
+
+Outputs:
+
+  SimpleVPCId:
+    Value: !Ref CreateVPC
+
