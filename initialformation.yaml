@@ -32,12 +32,12 @@ Parameters:
 
 
   VPCBlock:
-    Description: 'VPC IP RANGE'
+    Description: VPC IP RANGE
     Type: String
     Default: 192.0.0.0/16
 
   PublicBlock:
-    Description: 'Public Subnet IP'
+    Description: Public Subnet IP
     Type: String
     Default: 10.1.1.0/24
 
@@ -84,89 +84,25 @@ Resources:
       Tags:
         - Key: Name
           Value: Basic EC2 WebServer
-
-
-  CreateVPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: !Ref VPCBlock
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      Tags:
-        - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref NamingPrefix
-              - VPC
-
-  CreateGateway:
-    Condition: PublicEnabled
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref NamingPrefix
-              - CreateGateway
-  AddGateway:
-    Condition: PublicEnabled
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref CreateVPC
-      InternetGatewayId: !Ref CreateGateway
-
-
-  PublicInternetRoute:
-    Condition: PublicEnabled
-    Type: AWS::EC2::Route
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref CreateGateway
-      RouteTableId: !Ref RoutingTable
-
-  RoutingTable:
-    Condition: PublicEnabled
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref CreateVPC
-      Tags:
-        - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref NamingPrefix
-              - Public
-              - RTB
-
-
-  SubnetforPublic:
-    Condition: PublicEnabled
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref CreateVPC
-      AvailabilityZone: !Select
-        - 0
-        - !GetAZs
-          Ref: 'AWS::Region'
-      CidrBlock: !Ref PublicBlock
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref NamingPrefix
-              - Public
-              - 1
-
-  PublicSubnet1RouteToInternet:
-    Condition: PublicEnabled
-    Type: AWS::EC2::SubnetRouteTableAssociation
+  S3Bucket:
+    DeletionPolicy: Retain
+    Type: 'AWS::S3::Bucket'
     DependsOn:
-      - SubnetforPublic
-      - RoutingTable
+      - EC2WebserverInstance
+    Description: Creating Amazon S3 bucket from CloudFormation
     Properties:
-      RouteTableId: !Ref RoutingTable
-      SubnetId: !Ref SubnetforPublic
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
 
 
   PublicSecurityGroup:
@@ -197,8 +133,92 @@ Resources:
               - SG
 
 
+  CreateVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCBlock
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - VPC
+  RoutingTable:
+    Condition: PublicEnabled
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref CreateVPC
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - Public
+              - RTB
+  PublicInternetRoute:
+    Condition: PublicEnabled
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref CreateGateway
+      RouteTableId: !Ref RoutingTable
+
+  CreateGateway:
+    Condition: PublicEnabled
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - CreateGateway
+  AddGateway:
+    Condition: PublicEnabled
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref CreateVPC
+      InternetGatewayId: !Ref CreateGateway
+
+  SubnetforPublic:
+    Condition: PublicEnabled
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref CreateVPC
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: 'AWS::Region'
+      CidrBlock: !Ref PublicBlock
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref NamingPrefix
+              - Public
+              - 1
+
+  PublicSubnetRouteToInternet:
+    Condition: PublicEnabled
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn:
+      - SubnetforPublic
+      - RoutingTable
+    Properties:
+      RouteTableId: !Ref RoutingTable
+      SubnetId: !Ref SubnetforPublic
+
+
+
+
 Outputs:
 
   SimpleVPCId:
     Value: !Ref CreateVPC
+  S3Bucket:
+    Description: Bucket Created using this template.
+    Value: !Ref S3Bucket
 
