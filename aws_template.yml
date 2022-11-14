@@ -398,6 +398,27 @@ Mappings:
       HVM64: ami-01fee56b22f308154
       HVMG2: ami-0fe84a5b4563d8f27
 Resources:
+  S3Bucket:
+    DeletionPolicy: Retain
+    Type: 'AWS::S3::Bucket'
+    DependsOn:
+      - WebServerInstance
+    Description: Creating Amazon S3 bucket from CloudFormation
+    Properties:
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+
+
   WebServerInstance:
     Type: 'AWS::EC2::Instance'
     Metadata:
@@ -696,6 +717,9 @@ Resources:
           ToPort: '22'
           CidrIp: !Ref SSHLocation
 Outputs:
+  S3Bucket:
+    Description: Bucket Created using this template.
+    Value: !Ref S3Bucket
   WebsiteURL:
     Description: URL for newly created LAMP stack
     Value: !Join

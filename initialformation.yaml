@@ -79,8 +79,8 @@ Resources:
       ImageId: !Ref AMIType
       InstanceType: !Ref InstanceType
       SecurityGroupIds:
-        - !Ref PublicSecurityGroup
-      SubnetId: !Ref SubnetforPublic
+        - Ref PublicSecurityGroup
+      SubnetId: Ref SubnetforPublic
       Tags:
         - Key: Name
           Value: Basic EC2 WebServer
@@ -91,8 +91,8 @@ Resources:
       ImageId: !Ref AMIType
       InstanceType: !Ref InstanceType
       SecurityGroupIds:
-        - !Ref PublicSecurityGroup
-      SubnetId: !Ref SubnetforPublic
+        - Ref PublicSecurityGroup
+      SubnetId: Ref SubnetforPublic
       Tags:
         - Key: Name
           Value: Basic Backup EC2 WebServer
@@ -119,13 +119,13 @@ Resources:
 
 
   PublicSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+    Type: AWS::EC2::SecurityGroupId
     Condition: EC2SecurityEnabled
     Properties:
       VpcId: !Ref CreateVPC
       GroupName: !Join
         - '-'
-        - - !Ref NamingPrefix
+        - - Ref NamingPrefix
           - SG
       GroupDescription: >-
         Enable HTTP access via port 80 and 443 to the allowed CIDR
@@ -222,7 +222,7 @@ Resources:
       - RoutingTable
     Properties:
       RouteTableId: !Ref RoutingTable
-      SubnetId: !Ref SubnetforPublic
+      SubnetId: Ref SubnetforPublic
 
 
 
