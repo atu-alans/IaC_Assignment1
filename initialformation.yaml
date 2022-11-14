@@ -84,6 +84,19 @@ Resources:
       Tags:
         - Key: Name
           Value: Basic EC2 WebServer
+
+  EC2BackupWebserverInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIType
+      InstanceType: !Ref InstanceType
+      SecurityGroupIds:
+        - !Ref PublicSecurityGroup
+      SubnetId: !Ref SubnetforPublic
+      Tags:
+        - Key: Name
+          Value: Basic Backup EC2 WebServer
+
   S3Bucket:
     DeletionPolicy: Retain
     Type: 'AWS::S3::Bucket'
