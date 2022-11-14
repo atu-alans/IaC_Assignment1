@@ -8,6 +8,8 @@ Description: >-
   EC2 instance. You will be billed for the AWS resources used if you create a
   stack from this template.
 Parameters:
+
+
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
     Type: 'AWS::EC2::KeyPair::KeyName'
@@ -400,6 +402,70 @@ Mappings:
 
 
 Resources:
+
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      InstanceTenancy: "default"
+      Tags:
+      - Key: "Name"
+        Value: !Ref "Tag"
+
+  SubnetA:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: 'AWS::Region'
+      VpcId: !Ref "VPC"
+      CidrBlock: "10.0.0.0/24"
+
+  SubnetB:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs
+          Ref: 'AWS::Region'
+      VpcId: !Ref "VPC"
+      CidrBlock: "10.0.1.0/24"
+
+  RouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "VPC"
+
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+
+  VPCGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref "VPC"
+      InternetGatewayId: !Ref "InternetGateway"
+
+  InternetRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+
+  SubnetARouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetA
+
+  SubnetBRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetB
+
+
   S3Bucket:
     DeletionPolicy: Retain
     Type: 'AWS::S3::Bucket'
@@ -436,6 +502,7 @@ Resources:
   InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      VpcId: !Ref VPC
       GroupDescription: Enable SSH access via port 22
       SecurityGroupIngress:
       - IpProtocol: tcp
@@ -740,6 +807,9 @@ Resources:
           ToPort: '22'
           CidrIp: !Ref SSHLocation
 Outputs:
+  VpcId:
+    Description: The VPC ID
+    Value: !Ref VPC
   S3Bucket:
     Description: Bucket Created using this template.
     Value: !Ref S3Bucket
