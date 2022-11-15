@@ -4,7 +4,6 @@ Description: >-
   The template creates a VPC and an EC2 instance. The instance is within a security group. There is public access via a routing table.
 
 
-
 Parameters:
 
 
